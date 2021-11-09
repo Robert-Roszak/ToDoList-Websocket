@@ -1,25 +1,54 @@
 import React from 'react';
-import { io } from 'socket.io-client';
+import io from 'socket.io-client';
+import { v4 as uuidv4 } from 'uuid';
 
 class App extends React.Component {
 
   state = {
     tasks: [],
+    taskName: '',
   };
 
   componentDidMount() {
-    //this.socket = io('http://localhost:8000');
-    this.socket = io.connect('http://localhost:8000/');
+    this.socket = io('http://localhost:8000');
     console.log(this.socket);
-    this.socket.on('updateData', (tasks) => this.updateTasks(tasks));
+    this.socket.on('updateData', (tasks) => this.updateData(tasks));
+    this.socket.on('addTask', (task) => this.addTask(task));
+    this.socket.on('removeTask', (id) => this.removeTask(id));
   };
 
-  updateTasks = (tasks) => {
-    console.log('tasks: ', tasks);
+  updateData = (tasks) => {
+    this.setState({
+      tasks: tasks,
+    });
+  };  
+
+  addTask = (task) => {
+    this.setState({
+      tasks: [...this.state.tasks, task]
+    });
+  };
+
+  submitForm = (e) => {
+    e.preventDefault();
+    const task = {id: uuidv4(), name: this.state.taskName};
+    this.addTask(task)
+    this.socket.emit('addTask', task);
+    this.setState({
+      taskName: '',
+    });
+  };
+
+  removeTask = (id, local) => {
+    const filtered = this.state.tasks.filter(task => task.id !== id);
+    this.setState({
+      tasks: filtered,
+    });
+    if (local) this.socket.emit('removeTask', id);
   };
 
   render() {
-    const { tasks } = this.state;
+    const { tasks, taskName } = this.state;
     return (
       <div className="App">
     
@@ -33,15 +62,26 @@ class App extends React.Component {
           <ul className="tasks-section__list" id="tasks-list">
             {tasks.map(task => (
               <li key={task.id} className="task">{task.name}
-                <button className="btn btn-red">Remove</button>
+                <button onClick={e => {
+                  e.preventDefault();
+                  this.removeTask(task.id, true);
+                }} className="btn btn-red">Remove</button>
               </li>
             ))}
-            {/* <li class="task">Shopping <button class="btn btn--red">Remove</button></li>
-            <li class="task">Go out with a dog <button class="btn btn--red">Remove</button></li> */}
           </ul>
     
-          <form id="add-task-form">
-            <input className="text-input" autoComplete="off" type="text" placeholder="Type your description" id="task-name" />
+          <form onSubmit={this.submitForm} id="add-task-form">
+            <input
+            className="text-input"
+            autoComplete="off"
+            type="text"
+            placeholder="Type your description"
+            id="task-name"
+            value={taskName}
+            onChange={event => {
+              this.setState({ taskName: event.target.value });
+            }}
+            />
             <button className="btn" type="submit">Add</button>
           </form>
     
